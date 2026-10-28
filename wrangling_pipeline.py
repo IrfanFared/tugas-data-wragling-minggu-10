@@ -1,7 +1,5 @@
 """Pipeline transformasi dan pengolahan data kesehatan Indonesia.
 
-Modul ini menyediakan fungsi-fungsi dalam Bahasa Indonesia yang terstruktur,
-modular, dan reusable untuk menjalankan alur Data Wrangling (Task 1 sampai Task 5).
 """
 
 import pandas as pd
@@ -36,32 +34,13 @@ KOLOM_KORELASI = [
 
 
 def pisahkan_tabel(data):
-    """Pecah dataset master menjadi tabel dimensi wilayah unik dan tabel fakta indikator.
-
-    Parameter:
-        data (pd.DataFrame): Dataset master kesehatan awal.
-
-    Mengembalikan:
-        tuple[pd.DataFrame, pd.DataFrame]:
-            - dimensi (df_dim_wilayah): Tabel dimensi wilayah unik (514 baris, 5 kolom).
-            - fakta (df_fakta_kesehatan): Tabel fakta dengan kolom Kabupaten/Kota, Tahun, dan 23 indikator.
-    """
+    
     dimensi = data.loc[:, KOLOM_DIMENSI].drop_duplicates().reset_index(drop=True)
     fakta = data.drop(columns=KOLOM_DIMENSI[1:])
     return dimensi, fakta
 
 
 def buat_data_long(data):
-    """Ubah format dataset dari bentuk wide menjadi format long (tidy data).
-
-    Menghasilkan 4 kolom: ['Kabupaten/Kota', 'Tahun', 'Nama Indikator', 'Nilai'].
-
-    Parameter:
-        data (pd.DataFrame): Dataset master awal.
-
-    Mengembalikan:
-        pd.DataFrame: Dataframe dalam format long/tidy (59.110 baris, 4 kolom).
-    """
     indikator = [
         kolom for kolom in data.columns if kolom not in KOLOM_ID + KOLOM_LOKASI
     ]
@@ -74,16 +53,6 @@ def buat_data_long(data):
 
 
 def buat_panel_stunting(data):
-    """Buat tabel panel (pivot) prevalensi stunting per kabupaten/kota untuk 5 tahun observasi.
-
-    Baris menunjukkan Kabupaten/Kota dan kolom menunjukkan Tahun (2015, 2018, 2019, 2021, 2023).
-
-    Parameter:
-        data (pd.DataFrame): Dataset master awal.
-
-    Mengembalikan:
-        pd.DataFrame: Tabel panel stunting berdimensi (514 x 5).
-    """
     daftar_tahun = [2015, 2018, 2019, 2021, 2023]
     panel = data.pivot(
         index="Kabupaten/Kota", columns="Tahun", values=KOLOM_STUNTING
@@ -92,14 +61,6 @@ def buat_panel_stunting(data):
 
 
 def filter_stunting_dan_kemiskinan_2023(data):
-    """Filter wilayah berisiko pada tahun 2023 dengan ambang stunting > 30% dan kemiskinan > 10%.
-
-    Parameter:
-        data (pd.DataFrame): Dataset master awal.
-
-    Mengembalikan:
-        pd.DataFrame: Observasi tahun 2023 yang memenuhi kedua ambang risiko.
-    """
     return data.loc[
         data["Tahun"].eq(2023)
         & data[KOLOM_STUNTING].gt(0.30)
@@ -108,29 +69,11 @@ def filter_stunting_dan_kemiskinan_2023(data):
 
 
 def gabungkan_dimensi_dan_fakta(dimensi, fakta):
-    """Gabungkan tabel dimensi dan fakta menggunakan teknik Left Join pada kunci Kabupaten/Kota.
-
-    Parameter:
-        dimensi (pd.DataFrame): Tabel dimensi wilayah unik.
-        fakta (pd.DataFrame): Tabel fakta indikator kesehatan.
-
-    Mengembalikan:
-        pd.DataFrame: Hasil gabungan (2.570 baris x 29 kolom).
-    """
+  
     return dimensi.merge(fakta, on="Kabupaten/Kota", how="left", validate="one_to_many")
 
 
 def ringkas_kesehatan_per_wilayah(data):
-    """Hitung rata-rata (mean) dan standar deviasi (std) AKI dan Stunting secara hierarkis.
-
-    Tingkatan hierarki: Wilayah Indonesia -> Pulau -> Tipe Wilayah.
-
-    Parameter:
-        data (pd.DataFrame): Dataset master kesehatan.
-
-    Mengembalikan:
-        pd.DataFrame: Ringkasan statistik hierarkis.
-    """
     ringkasan_list = []
     for kolom_wilayah in ["Wilayah Indonesia", "Pulau", "Tipe Wilayah"]:
         grup = data.groupby(kolom_wilayah)[[KOLOM_AKI, KOLOM_STUNTING]].agg(["mean", "std"])
@@ -154,14 +97,7 @@ def ringkas_kesehatan_per_wilayah(data):
 
 
 def normalisasi_minmax_per_pulau(data):
-    """Lakukan normalisasi Min-Max (skala 0-1) untuk Kepadatan Penduduk dan PDRB per Pulau (tahun 2023).
-
-    Parameter:
-        data (pd.DataFrame): Dataset master kesehatan.
-
-    Mengembalikan:
-        pd.DataFrame: Data tahun 2023 yang diperkaya dengan kolom normalisasi skala pulau.
-    """
+    
     ternormalisasi = data.loc[data["Tahun"].eq(2023)].copy()
     for sumber, target in [
         (KOLOM_KEPADATAN, "Kepadatan Penduduk Normal"),
@@ -174,19 +110,7 @@ def normalisasi_minmax_per_pulau(data):
 
 
 def tambah_kategori_stunting(data):
-    """Kategorisasi prevalensi stunting tahun 2023 menjadi Rendah, Sedang, atau Tinggi / Kritis.
 
-    Ketentuan batas ambang:
-        - < 0.20        : Rendah
-        - 0.20 - 0.30   : Sedang
-        - > 0.30        : Tinggi / Kritis
-
-    Parameter:
-        data (pd.DataFrame): Dataset master kesehatan.
-
-    Mengembalikan:
-        pd.DataFrame: Dataset dengan kolom tambahan 'Kategori Stunting'.
-    """
     hasil = data.copy()
     nilai = hasil[KOLOM_STUNTING]
     hasil["Kategori Stunting"] = pd.NA
@@ -200,14 +124,7 @@ def tambah_kategori_stunting(data):
 
 
 def cari_outlier_iqr(data):
-    """Deteksi pencilan (outlier) tahun 2023 pada PDRB per Kapita dan Kepadatan Penduduk dengan metode 1.5 x IQR.
-
-    Parameter:
-        data (pd.DataFrame): Dataset master kesehatan.
-
-    Mengembalikan:
-        pd.DataFrame: Daftar observasi outlier beserta nilai dan variabelnya.
-    """
+    
     sub = data.loc[data["Tahun"].eq(2023)].copy()
     daftar_outlier = []
     for kolom in [KOLOM_PDRB, KOLOM_KEPADATAN]:
@@ -223,37 +140,5 @@ def cari_outlier_iqr(data):
 
 
 def korelasi_kesehatan(data):
-    """Hitung matriks korelasi Pearson untuk 5 indikator sosio-ekonomi dan kesehatan.
 
-    Parameter:
-        data (pd.DataFrame): Dataset master kesehatan.
-
-    Mengembalikan:
-        pd.DataFrame: Matriks korelasi Pearson berukuran 5x5.
-    """
     return data.loc[:, KOLOM_KORELASI].corr(method="pearson")
-
-
-# ==============================================================================
-# Alias Kompatibilitas Bahasa Inggris (Backward Compatibility)
-# ==============================================================================
-DIMENSION_COLUMNS = KOLOM_DIMENSI
-LOCATION_COLUMNS = KOLOM_LOKASI
-ID_COLUMNS = KOLOM_ID
-STUNTING_COLUMN = KOLOM_STUNTING
-POVERTY_COLUMN = KOLOM_KEMISKINAN
-AKI_COLUMN = KOLOM_AKI
-DENSITY_COLUMN = KOLOM_KEPADATAN
-PDRB_COLUMN = KOLOM_PDRB
-CORRELATION_COLUMNS = KOLOM_KORELASI
-
-split_tables = pisahkan_tabel
-make_long_data = buat_data_long
-make_stunting_panel = buat_panel_stunting
-filter_stunting_and_poverty_2023 = filter_stunting_dan_kemiskinan_2023
-merge_dimension_and_facts = gabungkan_dimensi_dan_fakta
-summarize_health_by_region = ringkas_kesehatan_per_wilayah
-minmax_by_island = normalisasi_minmax_per_pulau
-add_stunting_category = tambah_kategori_stunting
-find_iqr_outliers = cari_outlier_iqr
-health_correlation = korelasi_kesehatan
