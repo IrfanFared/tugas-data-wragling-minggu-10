@@ -3,8 +3,18 @@ from pathlib import Path
 import pandas as pd
 
 import wrangling_pipeline as pipeline
-
-from wrangling_pipeline import split_tables
+from wrangling_pipeline import (
+    buat_data_long,
+    buat_panel_stunting,
+    cari_outlier_iqr,
+    filter_stunting_dan_kemiskinan_2023,
+    gabungkan_dimensi_dan_fakta,
+    korelasi_kesehatan,
+    normalisasi_minmax_per_pulau,
+    pisahkan_tabel,
+    ringkas_kesehatan_per_wilayah,
+    tambah_kategori_stunting,
+)
 
 
 def test_split_tables_creates_distinct_dimension_and_fact_tables():
@@ -13,7 +23,7 @@ def test_split_tables_creates_distinct_dimension_and_fact_tables():
         columns=["Provinsi", "Pulau", "Wilayah Indonesia", "Tipe Wilayah"]
     )
 
-    dimension, facts = split_tables(raw_data)
+    dimension, facts = pisahkan_tabel(raw_data)
 
     assert list(dimension.columns) == [
         "Kabupaten/Kota",
@@ -32,7 +42,7 @@ def test_split_tables_creates_distinct_dimension_and_fact_tables():
 def test_long_data_has_required_tidy_columns_and_all_indicator_values():
     raw_data = pd.read_excel(Path(__file__).parents[1] / "Dataset_Kesehatan_Real_Names.xlsx")
 
-    long_data = pipeline.make_long_data(raw_data)
+    long_data = buat_data_long(raw_data)
 
     assert list(long_data.columns) == ["Kabupaten/Kota", "Tahun", "Nama Indikator", "Nilai"]
     assert long_data.shape == (59110, 4)
@@ -42,7 +52,7 @@ def test_long_data_has_required_tidy_columns_and_all_indicator_values():
 def test_stunting_panel_has_requested_year_columns():
     raw_data = pd.read_excel(Path(__file__).parents[1] / "Dataset_Kesehatan_Real_Names.xlsx")
 
-    panel = pipeline.make_stunting_panel(raw_data)
+    panel = buat_panel_stunting(raw_data)
 
     assert list(panel.columns) == [2015, 2018, 2019, 2021, 2023]
     assert panel.shape == (514, 5)
@@ -50,10 +60,10 @@ def test_stunting_panel_has_requested_year_columns():
 
 def test_2023_filter_and_left_join_preserve_expected_rows():
     raw_data = pd.read_excel(Path(__file__).parents[1] / "Dataset_Kesehatan_Real_Names.xlsx")
-    dimension, facts = split_tables(raw_data)
+    dimension, facts = pisahkan_tabel(raw_data)
 
-    filtered = pipeline.filter_stunting_and_poverty_2023(raw_data)
-    merged = pipeline.merge_dimension_and_facts(dimension, facts)
+    filtered = filter_stunting_dan_kemiskinan_2023(raw_data)
+    merged = gabungkan_dimensi_dan_fakta(dimension, facts)
 
     assert filtered["Tahun"].eq(2023).all()
     assert filtered["Prevalensi Stunting (%)"].gt(0.30).all()
@@ -64,9 +74,9 @@ def test_2023_filter_and_left_join_preserve_expected_rows():
 def test_task_four_summaries_normalization_and_categories():
     raw_data = pd.read_excel(Path(__file__).parents[1] / "Dataset_Kesehatan_Real_Names.xlsx")
 
-    summary = pipeline.summarize_health_by_region(raw_data)
-    normalized = pipeline.minmax_by_island(raw_data)
-    categorized = pipeline.add_stunting_category(raw_data)
+    summary = ringkas_kesehatan_per_wilayah(raw_data)
+    normalized = normalisasi_minmax_per_pulau(raw_data)
+    categorized = tambah_kategori_stunting(raw_data)
     values_2023 = categorized.loc[categorized["Tahun"].eq(2023)]
 
     assert set(summary["Level Wilayah"]) == {"Wilayah Indonesia", "Pulau", "Tipe Wilayah"}
@@ -81,8 +91,8 @@ def test_task_four_summaries_normalization_and_categories():
 def test_task_five_outliers_and_pearson_correlation_are_requested_shapes():
     raw_data = pd.read_excel(Path(__file__).parents[1] / "Dataset_Kesehatan_Real_Names.xlsx")
 
-    outliers = pipeline.find_iqr_outliers(raw_data)
-    correlation = pipeline.health_correlation(raw_data)
+    outliers = cari_outlier_iqr(raw_data)
+    correlation = korelasi_kesehatan(raw_data)
 
     assert outliers["Tahun"].eq(2023).all()
     assert set(outliers["Variabel"]) == {"PDRB per Kapita (Juta Rp)", "Kepadatan Penduduk (Jiwa/km2)"}
